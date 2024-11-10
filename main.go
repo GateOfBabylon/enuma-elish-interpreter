@@ -1,6 +1,7 @@
 package main
 
-func main() {
+import "github.com/GateOfBabylon/enuma-elish-interpreter/debug_dir"
 
-	MainHttpExecutor()
+func main() {
+	debug_dir.HttpEaToObj()
 }
