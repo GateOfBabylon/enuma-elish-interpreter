@@ -13,12 +13,13 @@ executor:
         - name: wait-for-ready
           scriptPath: ./scripts/wait_for_ready.py ${{status}}
         - name: confirm-or-reject
-          try:
-            - if: ${{status == 'ready'}}
-              scriptPath: ./scripts/confirm_resource.py
-            - if: ${{status == 'pending'}}
-              scriptPath: ./scripts/queue_resource_for_review.py
-            - if: ${{status == 'error'}}
-              scriptPath: ./scripts/report_resource_error.py
-          else:
-            scriptPath: ./scripts/reject_resource.py
+          pick:
+            if:
+                - try: ${{status == 'ready'}}
+                  scriptPath: ./scripts/confirm_resource.py
+                - try: ${{status == 'pending'}}
+                  scriptPath: ./scripts/queue_resource_for_review.py
+                - try: ${{status == 'error'}}
+                  scriptPath: ./scripts/report_resource_error.py
+            else:
+                scriptPath: ./scripts/reject_resource.py
