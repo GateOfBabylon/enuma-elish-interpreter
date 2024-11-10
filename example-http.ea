@@ -1,0 +1,36 @@
+executor:
+    name: fetch-and-process-items
+    type: http
+    env:
+        api_key: qwerty
+    tasks:
+        - name: fetch-item-list
+          export: ${{items}}
+          method: GET
+          url: http://example.com/api/item
+          headers:
+            Authorization: Bearer ${{api_key}}
+        - name: fetch-additional-data-parallel
+          parallel:
+            - name: fetch-item-details
+              export: ${{items.details}}
+              iterate: ${{items}}
+              method: GET
+              url: http://example.com/api/items/${{item.id}}/details
+              headers:
+                Authorization: Bearer ${{api_key}}
+            - name: fetch-item-stats
+              export: ${{items.stats}}
+              iterate: ${{items}}
+              method: GET
+              url: http://example.com/api/items/${{item.id}}/stats
+              headers:
+                Authorization: Bearer ${{api_key}}
+        - name: process-each-item
+          iterate: ${{items}}
+          method: GET
+          url: http://example.com/api/process/${{item.id}}
+          headers:
+            Authorization: Bearer ${{api_key}}
+            Content-Type: application/json
+          body: '{"details":${{item.details}}, "stats":${{item.stats}}}'
