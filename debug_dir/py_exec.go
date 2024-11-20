@@ -37,7 +37,7 @@ func PyObjToEa() {
 			{
 				Name: "confirm-or-reject",
 				ConditionStatements: &types.ConditionStatements{
-					Picks: &types.PickStatement{
+					Pick: &types.PickStatement{
 						IfStatement: []types.IfStatement{
 							{
 								Try: "${{status == 'ready'}}",

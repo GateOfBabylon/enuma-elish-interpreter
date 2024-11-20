@@ -2,33 +2,20 @@ package validate
 
 import (
 	"errors"
-	"fmt"
 	"github.com/GateOfBabylon/enuma-elish-interpreter/types"
 )
-
-type Validator interface {
-	Validate(exec *types.Executor) error
-}
-
-var ValidationFactory = make(map[types.ExecutorType]Validator)
-
-func RegisterValidator(executorType types.ExecutorType, validator Validator) {
-	ValidationFactory[executorType] = validator
-}
-
-func GetValidator(execType types.ExecutorType) (Validator, error) {
-	validator, exists := ValidationFactory[execType]
-	if !exists {
-		return nil, errors.New(fmt.Sprintf("validator for executor of type %s does not exist", execType))
-	}
-	return validator, nil
-}
 
 type PythonExecutorValidator struct{}
 
 func (pev *PythonExecutorValidator) Validate(exec *types.Executor) error {
-	if exec.Universe != nil {
-		return errors.New("universe property is not supported for Python executor")
+	if err := generalExecutorValidation(exec); err != nil {
+		return err
+	}
+	if exec.Universe == nil {
+		return errors.New("universe property is mandatory for Python executor")
+	}
+	if !(exec.Type == types.PYTHON) {
+		return errors.New("executor type must be python")
 	}
 	return nil
 }
@@ -36,19 +23,39 @@ func (pev *PythonExecutorValidator) Validate(exec *types.Executor) error {
 type HttpExecutorValidator struct{}
 
 func (hev *HttpExecutorValidator) Validate(exec *types.Executor) error {
-	if exec.Universe == nil {
-		return errors.New("universe property is mandatory for HTTP executor")
+	if err := generalExecutorValidation(exec); err != nil {
+		return err
+	}
+	if exec.Universe != nil {
+		return errors.New("universe property is not supported for HTTP executor")
+	}
+	if !(exec.Type == types.HTTP) {
+		return errors.New("executor type must be http")
 	}
 	return nil
 }
 
+func generalExecutorValidation(exec *types.Executor) error {
+	if exec.Name == "" {
+		return errors.New("executor name is mandatory")
+	}
+	if !IsValidName(exec.Name) {
+		return errors.New("executor name contains invalid characters")
+	}
+	if len(exec.Tasks) < 1 {
+		return errors.New("executor has no tasks")
+	}
+
+	return nil
+}
+
 func init() {
-	RegisterValidator(types.PYTHON, &PythonExecutorValidator{})
-	RegisterValidator(types.HTTP, &HttpExecutorValidator{})
+	RegisterExecutorValidator(types.PYTHON, &PythonExecutorValidator{})
+	RegisterExecutorValidator(types.HTTP, &HttpExecutorValidator{})
 }
 
 func ValidateExecutor(executor *types.Executor) error {
-	validator, err := GetValidator(executor.Type)
+	validator, err := GetExecutorValidator(executor.Type)
 	if err != nil {
 		return err
 	}
