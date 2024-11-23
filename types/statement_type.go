@@ -9,7 +9,7 @@ type TimeStatements struct {
 type ConditionStatements struct {
 	Condition string         `yaml:"condition,omitempty"`
 	Iterate   string         `yaml:"iterate,omitempty"`
-	Picks     *PickStatement `yaml:"pick,omitempty"`
+	Pick      *PickStatement `yaml:"pick,omitempty"`
 	Parallel  *[]Task        `yaml:"parallel,omitempty"`
 }
 
