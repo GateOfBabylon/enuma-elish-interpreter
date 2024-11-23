@@ -2,6 +2,7 @@ package validate
 
 import (
 	"errors"
+	"fmt"
 	"github.com/GateOfBabylon/enuma-elish-interpreter/types"
 )
 
@@ -54,7 +55,8 @@ func init() {
 	RegisterExecutorValidator(types.HTTP, &HttpExecutorValidator{})
 }
 
-func ValidateExecutor(executor *types.Executor) error {
+func Executor(executor *types.Executor) error {
+	fmt.Println(executor.Type)
 	validator, err := GetExecutorValidator(executor.Type)
 	if err != nil {
 		return err

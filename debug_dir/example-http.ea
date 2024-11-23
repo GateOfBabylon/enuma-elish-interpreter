@@ -34,3 +34,16 @@ executor:
             Authorization: Bearer ${{api_key}}
             Content-Type: application/json
           body: '{"details":${{item.details}}, "stats":${{item.stats}}}'
+        - name: check-status
+          method: GET
+          url: http://example.com/api/process/${{item.id}}/status
+          headers:
+            Authorization: Bearer ${{api_key}}
+            Content-Type: application/json
+          export: ${{status}}
+          pick:
+            if:
+                - try: ${{status == 'done'}}
+                  export: ${{status == 'Http request was successful'}}
+            else:
+                export: ${{status == 'Http request was NOT successful'}}
