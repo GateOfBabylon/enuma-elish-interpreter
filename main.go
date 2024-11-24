@@ -7,7 +7,7 @@ import (
 )
 
 func main() {
-	executor, err := parser.ParseExecutor("debug_dir/example-py.ea")
+	executor, err := parser.ParseExecutor("debug_dir/example-http.ea")
 	if err != nil {
 		panic(err)
 	}
