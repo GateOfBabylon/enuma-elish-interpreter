@@ -87,10 +87,6 @@ func validateConditionStatements(conditionStatements *types.ConditionStatements)
 		return errors.New(fmt.Sprintf("invalid condition syntax: %s", conditionStatements.Condition))
 	}
 
-	if conditionStatements.Iterate != "" && !isValidIterateSyntax(conditionStatements.Iterate) {
-		return errors.New(fmt.Sprintf("invalid iterate syntax: %s", conditionStatements.Iterate))
-	}
-
 	if conditionStatements.Pick != nil {
 		if err := validatePickStatement(conditionStatements.Pick); err != nil {
 			return errors.New(fmt.Sprintf("pick statement validation failed: %w", err))
@@ -141,12 +137,6 @@ func isValidCondition(condition string) bool {
 	// Validate condition syntax (e.g., logical expressions like ${{status == 'ready'}})
 	// Example placeholder implementation
 	return len(condition) > 0
-}
-
-func isValidIterateSyntax(iterate string) bool {
-	// Validate iterate syntax (e.g., ${{items}})
-	// Example placeholder implementation
-	return len(iterate) > 0
 }
 
 func init() {

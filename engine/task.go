@@ -7,6 +7,7 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/GateOfBabylon/enuma-elish-interpreter/types"
@@ -25,27 +26,24 @@ func ExecuteTask(task *types.Task, executorType types.ExecutorType) error {
 	case types.HTTP:
 		return executeHTTPTask(task)
 	case types.PYTHON:
-		return fmt.Errorf("Python executor type not implemented yet")
+		return fmt.Errorf("python executor type not implemented yet")
 	default:
 		return fmt.Errorf("executor type %s not implemented", executorType)
 	}
 }
 
-// executeHTTPTask handles the execution of HTTP tasks.
+// executeHTTPTask handles HTTP task execution.
 func executeHTTPTask(task *types.Task) error {
 	fmt.Printf("Executing HTTP task: %s\n", task.Name)
+	replaceEnvsInTask(task)
 
-	// Replace environment variables in the task
-	if err := replaceEnvsInTask(task); err != nil {
-		return fmt.Errorf("failed to replace environment variables: %w", err)
-	}
-
-	// Prepare the execution function
 	executeFunc := func() (string, error) {
-		return executeHTTPRequest(task.HttpTaskFields)
+		if task.HttpTaskFields != nil {
+			return executeHTTPRequest(task.HttpTaskFields)
+		}
+		return "", executeDefaultTask(task)
 	}
 
-	// Wrap the execution with timeout if specified
 	if task.TimeStatements != nil && task.TimeStatements.Timeout > 0 {
 		timeoutDuration := time.Duration(task.TimeStatements.Timeout) * time.Millisecond
 		executeFunc = func() (string, error) {
@@ -53,26 +51,68 @@ func executeHTTPTask(task *types.Task) error {
 		}
 	}
 
-	// Wrap the execution with retries if specified
-	var retries int
+	retries := 0
 	if task.TimeStatements != nil {
 		retries = task.TimeStatements.Retry
 	}
+
 	response, err := executeWithRetry(executeFunc, retries)
 	if err != nil {
 		return err
 	}
 
-	// Handle delay after execution if specified
 	if task.TimeStatements != nil && task.TimeStatements.Delay > 0 {
 		time.Sleep(time.Duration(task.TimeStatements.Delay) * time.Millisecond)
 	}
+	fmt.Println("Response before export: " + response)
+	if task.Export != "" && response != "" {
+		return resolveExport(task.Export, response)
+	}
 
-	// Handle export if specified
-	if task.Export != "" {
-		if err := resolveExport(task.Export, response); err != nil {
-			return err
+	return nil
+}
+
+// executeDefaultTask handles generic task execution, including parallel tasks.xq
+func executeDefaultTask(task *types.Task) error {
+	fmt.Printf("Executing task: %s\n", task.Name)
+
+	if task.ConditionStatements.Parallel != nil {
+		err := executeParallelTasks(task.ConditionStatements.Parallel)
+		return err
+	}
+	return fmt.Errorf("no execution logic defined for task: %s", task.Name)
+}
+
+// executeParallelTasks executes multiple tasks concurrently.
+func executeParallelTasks(parallelTasks *[]types.Task) error {
+	var wg sync.WaitGroup
+	errChan := make(chan error, len(*parallelTasks))
+
+	for _, subTask := range *parallelTasks {
+		wg.Add(1)
+		go func(t types.Task) {
+			defer wg.Done()
+			result, err := executeHTTPRequest(t.HttpTaskFields)
+			if err != nil {
+				errChan <- err
+			} else {
+				errChan <- resolveExport(subTask.Export, result)
+			}
+		}(subTask)
+	}
+
+	wg.Wait()
+	close(errChan)
+
+	errorSlice := make([]string, 0)
+	for err := range errChan {
+		if err != nil {
+			errorSlice = append(errorSlice, err.Error())
 		}
+	}
+
+	if len(errorSlice) > 0 {
+		return fmt.Errorf("parallel task execution encountered errors: %s", strings.Join(errorSlice, "; "))
 	}
 
 	return nil
@@ -80,24 +120,20 @@ func executeHTTPTask(task *types.Task) error {
 
 // executeHTTPRequest performs the HTTP request based on the provided HttpTaskFields.
 func executeHTTPRequest(httpFields *types.HttpTaskFields) (string, error) {
-	// Prepare the request body
 	var body io.Reader
 	if httpFields.Body != "" {
 		body = strings.NewReader(httpFields.Body)
 	}
 
-	// Create a new HTTP request
 	req, err := http.NewRequest(httpFields.Method, httpFields.Url, body)
 	if err != nil {
 		return "", fmt.Errorf("failed to create HTTP request: %w", err)
 	}
 
-	// Set the headers
 	for key, value := range httpFields.Headers {
 		req.Header.Set(key, value)
 	}
 
-	// Execute the request
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
@@ -105,7 +141,6 @@ func executeHTTPRequest(httpFields *types.HttpTaskFields) (string, error) {
 	}
 	defer resp.Body.Close()
 
-	// Read the response body
 	responseData, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", fmt.Errorf("failed to read response body: %w", err)
@@ -114,6 +149,7 @@ func executeHTTPRequest(httpFields *types.HttpTaskFields) (string, error) {
 	return string(responseData), nil
 }
 
+// /////////////////////
 // executeWithTimeout runs a function with a timeout.
 func executeWithTimeout(executeFunc func() (string, error), timeout time.Duration) (string, error) {
 	resultChan := make(chan string)
@@ -181,57 +217,36 @@ func resolveExport(exportStr string, response string) error {
 }
 
 // replaceEnvsInTask replaces all environment variable placeholders in the task fields.
-func replaceEnvsInTask(task *types.Task) error {
+func replaceEnvsInTask(task *types.Task) {
 	if task == nil {
-		return nil
+		return
 	}
-
-	var err error
 
 	// Replace in HTTP task fields
 	if task.HttpTaskFields != nil {
-		if task.HttpTaskFields.Method, err = resolveEnvVars(task.HttpTaskFields.Method); err != nil {
-			return err
-		}
-		if task.HttpTaskFields.Url, err = resolveEnvVars(task.HttpTaskFields.Url); err != nil {
-			return err
-		}
-		if task.HttpTaskFields.Body, err = resolveEnvVars(task.HttpTaskFields.Body); err != nil {
-			return err
-		}
+		task.HttpTaskFields.Method = resolveEnvVars(task.HttpTaskFields.Method)
+		task.HttpTaskFields.Url = resolveEnvVars(task.HttpTaskFields.Url)
+		task.HttpTaskFields.Body = resolveEnvVars(task.HttpTaskFields.Body)
 
 		// Replace in headers
 		for key, value := range task.HttpTaskFields.Headers {
-			if task.HttpTaskFields.Headers[key], err = resolveEnvVars(value); err != nil {
-				return err
-			}
+			task.HttpTaskFields.Headers[key] = resolveEnvVars(value)
 		}
 	}
 
 	// Replace in ConditionStatements
 	if task.ConditionStatements != nil {
-		if task.ConditionStatements.Iterate, err = resolveEnvVars(task.ConditionStatements.Iterate); err != nil {
-			return err
-		}
-		if task.ConditionStatements.Condition, err = resolveEnvVars(task.ConditionStatements.Condition); err != nil {
-			return err
-		}
+		task.ConditionStatements.Condition = resolveEnvVars(task.ConditionStatements.Condition)
 
 		// Replace in Picks
 		if task.ConditionStatements.Pick != nil {
 			if task.ConditionStatements.Pick.Else != nil {
-				if err := replaceEnvsInTask(task.ConditionStatements.Pick.Else); err != nil {
-					return err
-				}
+				replaceEnvsInTask(task.ConditionStatements.Pick.Else)
 			}
 			for _, ifStmt := range task.ConditionStatements.Pick.IfStatement {
-				if ifStmt.Try, err = resolveEnvVars(ifStmt.Try); err != nil {
-					return err
-				}
+				ifStmt.Try = resolveEnvVars(ifStmt.Try)
 				if ifStmt.Task != nil {
-					if err := replaceEnvsInTask(ifStmt.Task); err != nil {
-						return err
-					}
+					replaceEnvsInTask(ifStmt.Task)
 				}
 			}
 		}
@@ -239,27 +254,16 @@ func replaceEnvsInTask(task *types.Task) error {
 		// Replace in Parallel tasks
 		if task.ConditionStatements.Parallel != nil {
 			for i := range *task.ConditionStatements.Parallel {
-				if err := replaceEnvsInTask(&(*task.ConditionStatements.Parallel)[i]); err != nil {
-					return err
-				}
+				replaceEnvsInTask(&(*task.ConditionStatements.Parallel)[i])
 			}
 		}
 	}
 
-	// Replace in other fields
-	if task.Name, err = resolveEnvVars(task.Name); err != nil {
-		return err
-	}
-	if task.Export, err = resolveEnvVars(task.Export); err != nil {
-		return err
-	}
-
-	return nil
 }
 
 // resolveEnvVars replaces all environment variable placeholders in the input string.
-func resolveEnvVars(input string) (string, error) {
-	re := regexp.MustCompile(`\${{([^{}]+)}}`)
+func resolveEnvVars(input string) string {
+	re := regexp.MustCompile(`\${{\s*([^{}]+)\s*}}`)
 	matches := re.FindAllStringSubmatch(input, -1)
 
 	for _, match := range matches {
@@ -269,9 +273,10 @@ func resolveEnvVars(input string) (string, error) {
 		envVar := strings.TrimSpace(match[1])
 		value, exists := os.LookupEnv(envVar)
 		if !exists {
-			return "", fmt.Errorf("environment variable %s not found", envVar)
+			fmt.Printf("environment variable %s not found\n", envVar)
+			continue
 		}
-		input = strings.Replace(input, match[0], value, -1)
+		input = strings.ReplaceAll(input, match[0], value)
 	}
-	return input, nil
+	return input
 }

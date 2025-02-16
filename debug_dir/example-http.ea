@@ -2,48 +2,48 @@ executor:
     name: fetch-and-process-items
     type: http
     env:
-        api_key: qwerty
+        api_key: YWRtaW46YWRtaW4=
     tasks:
         - name: fetch-item-list
           export: ${{items}}
           method: GET
-          url: http://example.com/api/item
+          url: http://localhost:8080/api/items
           headers:
-            Authorization: Bearer ${{api_key}}
+            Authorization: Basic ${{api_key}}
         - name: fetch-additional-data-parallel
           parallel:
             - name: fetch-item-details
-              export: ${{items.details}}
-              iterate: ${{items}}
+              export: ${{itemDetails}}
               method: GET
-              url: http://example.com/api/items/${{item.id}}/details
+              url: http://localhost:8080/api/items/details
               headers:
-                Authorization: Bearer ${{api_key}}
+                Authorization: Basic ${{api_key}}
+                Content-Type: application/json
+              body: ${{items}}
             - name: fetch-item-stats
-              export: ${{items.stats}}
-              iterate: ${{items}}
+              export: ${{itemsStats}}
               method: GET
-              url: http://example.com/api/items/${{item.id}}/stats
+              url: http://localhost:8080/api/items/stats
               headers:
-                Authorization: Bearer ${{api_key}}
-        - name: process-each-item
-          iterate: ${{items}}
-          method: GET
-          url: http://example.com/api/process/${{item.id}}
+                Authorization: Basic ${{api_key}}
+        - name: process-details
+          method: POST
+          url: http://localhost:8080/api/process
           headers:
             Authorization: Bearer ${{api_key}}
             Content-Type: application/json
-          body: '{"details":${{item.details}}, "stats":${{item.stats}}}'
+          body: '{"details":${{itemDetails}}, "stats":${{itemsStats}}}'
         - name: check-status
-          method: GET
-          url: http://example.com/api/process/${{item.id}}/status
+          method: POST
+          url: http://localhost:8080/api/process/status
           headers:
-            Authorization: Bearer ${{api_key}}
+            Authorization: Basic ${{api_key}}
             Content-Type: application/json
+          body: ${{itemsStats}}
           export: ${{status}}
           pick:
             if:
-                - try: ${{status == 'done'}}
-                  export: ${{status == 'Http request was successful'}}
+                - try: ${{status}} == 'done'
+                  export: ${{status}} = 'Http request was successful'
             else:
-                export: ${{status == 'Http request was NOT successful'}}
+                export: ${{status}} = 'Http request was NOT successful'
