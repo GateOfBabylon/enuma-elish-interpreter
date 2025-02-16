@@ -33,7 +33,7 @@ executor:
             Authorization: Bearer ${{api_key}}
             Content-Type: application/json
           body: '{"details":${{itemDetails}}, "stats":${{itemsStats}}}'
-        - name: check-status
+        - name: export-status
           method: POST
           url: http://localhost:8080/api/process/status
           headers:
@@ -41,9 +41,10 @@ executor:
             Content-Type: application/json
           body: ${{itemsStats}}
           export: ${{status}}
+        - name: check-results
           pick:
             if:
                 - try: ${{status}} == 'done'
-                  export: ${{status}} = 'Http request was successful'
+                  export: ${{result}} = 'Http request was successful'
             else:
-                export: ${{status}} = 'Http request was NOT successful'
+                export: ${{result}} = 'Http request was NOT successful'

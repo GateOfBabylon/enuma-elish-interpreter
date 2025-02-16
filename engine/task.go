@@ -76,11 +76,62 @@ func executeHTTPTask(task *types.Task) error {
 func executeDefaultTask(task *types.Task) error {
 	fmt.Printf("Executing task: %s\n", task.Name)
 
-	if task.ConditionStatements.Parallel != nil {
-		err := executeParallelTasks(task.ConditionStatements.Parallel)
-		return err
+	if task.ConditionStatements != nil {
+		if task.ConditionStatements.Parallel != nil {
+			return executeParallelTasks(task.ConditionStatements.Parallel)
+		}
+
+		if task.ConditionStatements.Pick != nil {
+			return executePickStatement(task.ConditionStatements.Pick)
+		}
+	}
+	if task.Export != "" {
+		return resolveExportIntoOs(task.Export)
 	}
 	return fmt.Errorf("no execution logic defined for task: %s", task.Name)
+}
+
+func executePickStatement(pick *types.PickStatement) error {
+
+	for _, statement := range pick.IfStatement {
+		if calculateCondition(statement.Try) {
+			task := statement.Task
+			if task.PyTaskFields != nil {
+				return fmt.Errorf("not Implemented")
+			} else if task.HttpTaskFields != nil {
+				return executeHTTPTask(task)
+			} else {
+				return executeDefaultTask(task)
+			}
+		}
+	}
+	if pick.Else != nil {
+		task := pick.Else
+		if task.PyTaskFields != nil {
+			return fmt.Errorf("not Implemented")
+		} else if task.HttpTaskFields != nil {
+			return executeHTTPTask(task)
+		} else {
+			return executeDefaultTask(task)
+		}
+	}
+	return nil
+}
+
+func calculateCondition(condition string) bool {
+	if strings.Contains(condition, "==") {
+		parts := strings.Split(condition, "==")
+		if len(parts) != 2 {
+			return false
+		}
+
+		left := resolveEnvVars(strings.TrimSpace(parts[0]))
+		right := strings.TrimSpace(parts[1])
+
+		right = strings.Trim(right, "'")
+		return left == right
+	}
+	return false
 }
 
 // executeParallelTasks executes multiple tasks concurrently.
@@ -149,7 +200,6 @@ func executeHTTPRequest(httpFields *types.HttpTaskFields) (string, error) {
 	return string(responseData), nil
 }
 
-// /////////////////////
 // executeWithTimeout runs a function with a timeout.
 func executeWithTimeout(executeFunc func() (string, error), timeout time.Duration) (string, error) {
 	resultChan := make(chan string)
@@ -213,6 +263,37 @@ func resolveExport(exportStr string, response string) error {
 	}
 
 	fmt.Printf("Exported environment variable: %s = %s\n", varName, response)
+	return nil
+}
+
+func resolveExportIntoOs(exportStr string) error {
+	// Ensure the export string contains "="
+	parts := strings.SplitN(exportStr, "=", 2)
+	if len(parts) != 2 {
+		return fmt.Errorf("invalid export format, expected 'VAR_NAME=VALUE', got: %s", exportStr)
+	}
+
+	left := strings.TrimSpace(parts[0])
+	right := strings.TrimSpace(parts[1])
+
+	// Regular expression to extract variable name inside ${{VAR_NAME}}
+	exportPattern := regexp.MustCompile(`^\${{\s*([\w_]+)\s*}}$`)
+	matches := exportPattern.FindStringSubmatch(left)
+	if len(matches) != 2 {
+		return fmt.Errorf("invalid export pattern, expected format: `${{VAR_NAME}}`, got: %s", left)
+	}
+
+	varName := matches[1]
+	if varName == "" {
+		return fmt.Errorf("export variable name is empty")
+	}
+
+	// Set the environment variable
+	if err := os.Setenv(varName, right); err != nil {
+		return fmt.Errorf("failed to set export variable %s: %w", varName, err)
+	}
+
+	fmt.Printf("Exported environment variable: %s = %s\n", varName, right)
 	return nil
 }
 
