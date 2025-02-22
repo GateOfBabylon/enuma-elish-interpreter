@@ -3,6 +3,7 @@ package ops
 import (
 	"fmt"
 	"github.com/GateOfBabylon/enuma-elish-interpreter/types"
+	"log"
 	"os"
 	"regexp"
 	"strings"
@@ -57,6 +58,21 @@ func ResolveExportIntoOs(exportStr string) error {
 	}
 
 	return nil
+}
+
+func ExtractExportedValue(output string) (string, error) {
+	exportPattern := regexp.MustCompile(`(?m)export\s+(\w+)\s*=\s*(.+)`)
+	matches := exportPattern.FindStringSubmatch(output)
+
+	if len(matches) != 3 {
+		return "", fmt.Errorf("failed to extract export value from output")
+	}
+
+	varName := strings.TrimSpace(matches[1])
+	varValue := strings.TrimSpace(matches[2])
+
+	log.Printf("Extracted exported variable: %s = %s", varName, varValue)
+	return varValue, nil
 }
 
 // ReplaceEnvsInTask replaces all environment variable placeholders in the task fields.

@@ -2,10 +2,12 @@ package engine
 
 import (
 	"fmt"
+	"log"
+	"os"
+
 	"github.com/GateOfBabylon/enuma-elish-interpreter/convert"
 	"github.com/GateOfBabylon/enuma-elish-interpreter/types"
 	"github.com/GateOfBabylon/enuma-elish-interpreter/validate"
-	"os"
 )
 
 func ExecuteExecutor(executor *types.Executor) error {
@@ -13,13 +15,13 @@ func ExecuteExecutor(executor *types.Executor) error {
 		return fmt.Errorf("executor validation failed: %w", err)
 	}
 
-	fmt.Printf("Executing executor: %s\n", executor.Name)
+	log.Printf("Executing executor: %s, type: %s\n", executor.Name, executor.Type)
 	if err := ExtractEnvs(executor); err != nil {
 		return err
 	}
 
 	for _, task := range executor.Tasks {
-		if err := ExecuteTask(&task, executor.Type); err != nil {
+		if err := ExecuteTask(&task, executor); err != nil {
 			return fmt.Errorf("task %q execution failed: %w", task.Name, err)
 		}
 	}
@@ -32,6 +34,7 @@ func ExtractEnvs(executor *types.Executor) error {
 		if err := os.Setenv(key, strValue); err != nil {
 			return fmt.Errorf("setting environment variable %q failed: %w", key, err)
 		}
+		log.Printf("Set environment variable: %s=%s\n", key, strValue)
 	}
 	return nil
 }
