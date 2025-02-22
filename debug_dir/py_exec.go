@@ -1,7 +1,6 @@
 package debug_dir
 
 import (
-	"fmt"
 	"github.com/GateOfBabylon/enuma-elish-interpreter/types"
 	"gopkg.in/yaml.v3"
 	"log"
@@ -86,8 +85,6 @@ func PyObjToEa() {
 	if err != nil {
 		log.Fatalf("Failed to write YAML to file: %v", err)
 	}
-
-	fmt.Println("Executor data has been saved to example-py.ea")
 }
 
 func PyEaToObj() {

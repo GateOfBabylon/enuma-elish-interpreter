@@ -12,14 +12,16 @@ func (htv *HttpTaskValidator) Validate(task *types.Task) error {
 	if err := generalTaskValidation(task); err != nil {
 		return err
 	}
-	if task.HttpTaskFields == nil {
-		return errors.New("HTTP task fields are required")
+	if task.PyTaskFields != nil {
+		return errors.New("HTTP task could not use other task specific fields")
 	}
-	if !IsSupportedHttpMethod(task.HttpTaskFields.Method) {
-		return errors.New(fmt.Sprintf("HTTP method %q is not supported", task.HttpTaskFields.Method))
-	}
-	if task.HttpTaskFields.Url == "" {
-		return errors.New("URL is required")
+	if task.HttpTaskFields != nil {
+		if !IsSupportedHttpMethod(task.HttpTaskFields.Method) {
+			return errors.New(fmt.Sprintf("HTTP method %q is not supported", task.HttpTaskFields.Method))
+		}
+		if task.HttpTaskFields.Url == "" {
+			return errors.New("URL is required")
+		}
 	}
 	return nil
 }
@@ -30,15 +32,19 @@ func (ptv *PythonTaskValidator) Validate(task *types.Task) error {
 	if err := generalTaskValidation(task); err != nil {
 		return err
 	}
-	if task.PyTaskFields == nil {
-		return errors.New("python task fields are required")
+
+	if task.HttpTaskFields != nil {
+		return errors.New("python task could not use other task specific fields")
 	}
-	// One of script or script path must be different from empty string
-	if task.PyTaskFields.Script == "" && task.PyTaskFields.ScriptPath == "" {
-		return errors.New("script or script path is required")
-	}
-	if task.PyTaskFields.Script != "" && task.PyTaskFields.ScriptPath != "" {
-		return errors.New("script and script path are mutually exclusive")
+
+	if task.PyTaskFields != nil {
+		// One of script or script path must be different from empty string
+		if task.PyTaskFields.Script == "" && task.PyTaskFields.ScriptPath == "" {
+			return errors.New("script or script path is required")
+		}
+		if task.PyTaskFields.Script != "" && task.PyTaskFields.ScriptPath != "" {
+			return errors.New("script and script path are mutually exclusive")
+		}
 	}
 	return nil
 }
@@ -79,10 +85,6 @@ func validateConditionStatements(conditionStatements *types.ConditionStatements)
 
 	if conditionStatements.Condition != "" && !isValidCondition(conditionStatements.Condition) {
 		return errors.New(fmt.Sprintf("invalid condition syntax: %s", conditionStatements.Condition))
-	}
-
-	if conditionStatements.Iterate != "" && !isValidIterateSyntax(conditionStatements.Iterate) {
-		return errors.New(fmt.Sprintf("invalid iterate syntax: %s", conditionStatements.Iterate))
 	}
 
 	if conditionStatements.Pick != nil {
@@ -135,12 +137,6 @@ func isValidCondition(condition string) bool {
 	// Validate condition syntax (e.g., logical expressions like ${{status == 'ready'}})
 	// Example placeholder implementation
 	return len(condition) > 0
-}
-
-func isValidIterateSyntax(iterate string) bool {
-	// Validate iterate syntax (e.g., ${{items}})
-	// Example placeholder implementation
-	return len(iterate) > 0
 }
 
 func init() {

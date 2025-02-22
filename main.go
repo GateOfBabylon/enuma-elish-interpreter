@@ -1,7 +1,17 @@
 package main
 
-import "github.com/GateOfBabylon/enuma-elish-interpreter/debug_dir"
+import (
+	"github.com/GateOfBabylon/enuma-elish-interpreter/engine"
+	"github.com/GateOfBabylon/enuma-elish-interpreter/parser"
+)
 
 func main() {
-	debug_dir.HttpEaToObj()
+	executor, err := parser.ParseExecutor("debug_dir/example-http.ea")
+	if err != nil {
+		panic(err)
+	}
+	err = engine.ExecuteExecutor(executor)
+	if err != nil {
+		panic(err)
+	}
 }

@@ -1,6 +1,6 @@
 executor:
     name: confirm-or-reject-status
-    type: py
+    type: python
     universe:
         world: docker.io/my-docker-image:latest
         secret: my_docker_registry_credentials

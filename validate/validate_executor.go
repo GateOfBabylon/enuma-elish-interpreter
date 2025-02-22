@@ -54,7 +54,7 @@ func init() {
 	RegisterExecutorValidator(types.HTTP, &HttpExecutorValidator{})
 }
 
-func ValidateExecutor(executor *types.Executor) error {
+func Executor(executor *types.Executor) error {
 	validator, err := GetExecutorValidator(executor.Type)
 	if err != nil {
 		return err
