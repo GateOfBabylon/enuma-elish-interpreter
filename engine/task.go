@@ -4,12 +4,11 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
-	"regexp"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/GateOfBabylon/enuma-elish-interpreter/engine/ops"
 	"github.com/GateOfBabylon/enuma-elish-interpreter/types"
 	"github.com/GateOfBabylon/enuma-elish-interpreter/validate"
 )
@@ -26,6 +25,7 @@ func ExecuteTask(task *types.Task, executorType types.ExecutorType) error {
 	case types.HTTP:
 		return executeHTTPTask(task)
 	case types.PYTHON:
+		// Future Python logic here
 		return fmt.Errorf("python executor type not implemented yet")
 	default:
 		return fmt.Errorf("executor type %s not implemented", executorType)
@@ -35,138 +35,66 @@ func ExecuteTask(task *types.Task, executorType types.ExecutorType) error {
 // executeHTTPTask handles HTTP task execution.
 func executeHTTPTask(task *types.Task) error {
 	fmt.Printf("Executing HTTP task: %s\n", task.Name)
-	replaceEnvsInTask(task)
+	ops.ReplaceEnvsInTask(task)
 
 	executeFunc := func() (string, error) {
 		if task.HttpTaskFields != nil {
 			return executeHTTPRequest(task.HttpTaskFields)
 		}
+		// Fallback if no HttpTaskFields -> go to default
 		return "", executeDefaultTask(task)
 	}
 
+	// Wrap with timeout if specified
 	if task.TimeStatements != nil && task.TimeStatements.Timeout > 0 {
 		timeoutDuration := time.Duration(task.TimeStatements.Timeout) * time.Millisecond
 		executeFunc = func() (string, error) {
-			return executeWithTimeout(executeFunc, timeoutDuration)
+			return ops.ExecuteWithTimeout(executeFunc, timeoutDuration)
 		}
 	}
 
+	// Apply retry logic
 	retries := 0
 	if task.TimeStatements != nil {
 		retries = task.TimeStatements.Retry
 	}
 
-	response, err := executeWithRetry(executeFunc, retries)
+	// Execute the function with optional retry
+	response, err := ops.ExecuteWithRetry(executeFunc, retries)
 	if err != nil {
 		return err
 	}
 
+	// Apply delay if specified
 	if task.TimeStatements != nil && task.TimeStatements.Delay > 0 {
 		time.Sleep(time.Duration(task.TimeStatements.Delay) * time.Millisecond)
 	}
-	fmt.Println("Response before export: " + response)
+
 	if task.Export != "" && response != "" {
-		return resolveExport(task.Export, response)
+		// Export the response to environment
+		return ops.ResolveExport(task.Export, response)
 	}
 
 	return nil
 }
 
-// executeDefaultTask handles generic task execution, including parallel tasks.xq
+// executeDefaultTask handles generic task execution, including parallel tasks, condition/pick statements.
 func executeDefaultTask(task *types.Task) error {
-	fmt.Printf("Executing task: %s\n", task.Name)
-
 	if task.ConditionStatements != nil {
 		if task.ConditionStatements.Parallel != nil {
 			return executeParallelTasks(task.ConditionStatements.Parallel)
 		}
-
 		if task.ConditionStatements.Pick != nil {
 			return executePickStatement(task.ConditionStatements.Pick)
 		}
 	}
+
+	// If there's no special logic, but we have an export directive
 	if task.Export != "" {
-		return resolveExportIntoOs(task.Export)
+		return ops.ResolveExportIntoOs(task.Export)
 	}
+
 	return fmt.Errorf("no execution logic defined for task: %s", task.Name)
-}
-
-func executePickStatement(pick *types.PickStatement) error {
-
-	for _, statement := range pick.IfStatement {
-		if calculateCondition(statement.Try) {
-			task := statement.Task
-			if task.PyTaskFields != nil {
-				return fmt.Errorf("not Implemented")
-			} else if task.HttpTaskFields != nil {
-				return executeHTTPTask(task)
-			} else {
-				return executeDefaultTask(task)
-			}
-		}
-	}
-	if pick.Else != nil {
-		task := pick.Else
-		if task.PyTaskFields != nil {
-			return fmt.Errorf("not Implemented")
-		} else if task.HttpTaskFields != nil {
-			return executeHTTPTask(task)
-		} else {
-			return executeDefaultTask(task)
-		}
-	}
-	return nil
-}
-
-func calculateCondition(condition string) bool {
-	if strings.Contains(condition, "==") {
-		parts := strings.Split(condition, "==")
-		if len(parts) != 2 {
-			return false
-		}
-
-		left := resolveEnvVars(strings.TrimSpace(parts[0]))
-		right := strings.TrimSpace(parts[1])
-
-		right = strings.Trim(right, "'")
-		return left == right
-	}
-	return false
-}
-
-// executeParallelTasks executes multiple tasks concurrently.
-func executeParallelTasks(parallelTasks *[]types.Task) error {
-	var wg sync.WaitGroup
-	errChan := make(chan error, len(*parallelTasks))
-
-	for _, subTask := range *parallelTasks {
-		wg.Add(1)
-		go func(t types.Task) {
-			defer wg.Done()
-			result, err := executeHTTPRequest(t.HttpTaskFields)
-			if err != nil {
-				errChan <- err
-			} else {
-				errChan <- resolveExport(subTask.Export, result)
-			}
-		}(subTask)
-	}
-
-	wg.Wait()
-	close(errChan)
-
-	errorSlice := make([]string, 0)
-	for err := range errChan {
-		if err != nil {
-			errorSlice = append(errorSlice, err.Error())
-		}
-	}
-
-	if len(errorSlice) > 0 {
-		return fmt.Errorf("parallel task execution encountered errors: %s", strings.Join(errorSlice, "; "))
-	}
-
-	return nil
 }
 
 // executeHTTPRequest performs the HTTP request based on the provided HttpTaskFields.
@@ -200,164 +128,75 @@ func executeHTTPRequest(httpFields *types.HttpTaskFields) (string, error) {
 	return string(responseData), nil
 }
 
-// executeWithTimeout runs a function with a timeout.
-func executeWithTimeout(executeFunc func() (string, error), timeout time.Duration) (string, error) {
-	resultChan := make(chan string)
-	errorChan := make(chan error)
+// executeParallelTasks executes multiple tasks concurrently.
+func executeParallelTasks(parallelTasks *[]types.Task) error {
+	var wg sync.WaitGroup
+	errChan := make(chan error, len(*parallelTasks))
 
-	go func() {
-		response, err := executeFunc()
-		if err != nil {
-			errorChan <- err
-			return
-		}
-		resultChan <- response
-	}()
+	for _, subTask := range *parallelTasks {
+		wg.Add(1)
+		go func(t types.Task) {
+			defer wg.Done()
 
-	select {
-	case response := <-resultChan:
-		return response, nil
-	case err := <-errorChan:
-		return "", err
-	case <-time.After(timeout):
-		return "", fmt.Errorf("task execution timed out after %s", timeout)
-	}
-}
-
-// executeWithRetry retries a function execution based on the specified retry count.
-func executeWithRetry(executeFunc func() (string, error), retries int) (string, error) {
-	var response string
-	var err error
-
-	for attempt := 0; attempt <= retries; attempt++ {
-		response, err = executeFunc()
-		if err == nil {
-			return response, nil
-		}
-
-		fmt.Printf("Attempt %d failed: %v\n", attempt+1, err)
-		if attempt < retries {
-			time.Sleep(1 * time.Second) // Default delay between retries
-			fmt.Printf("Retrying...\n")
-		}
-	}
-
-	return "", fmt.Errorf("all %d attempts failed: %w", retries+1, err)
-}
-
-// resolveExport parses the export pattern and sets the environment variable with the response.
-func resolveExport(exportStr string, response string) error {
-	exportPattern := regexp.MustCompile(`^\${{\s*([\w_]+)\s*}}$`)
-	matches := exportPattern.FindStringSubmatch(exportStr)
-	if len(matches) != 2 {
-		return fmt.Errorf("invalid export pattern, expected format: `${{VAR_NAME}}`, got: %s", exportStr)
-	}
-
-	varName := matches[1]
-	if varName == "" {
-		return fmt.Errorf("export variable name is empty")
-	}
-
-	if err := os.Setenv(varName, response); err != nil {
-		return fmt.Errorf("failed to set export variable %s: %w", varName, err)
-	}
-
-	fmt.Printf("Exported environment variable: %s = %s\n", varName, response)
-	return nil
-}
-
-func resolveExportIntoOs(exportStr string) error {
-	// Ensure the export string contains "="
-	parts := strings.SplitN(exportStr, "=", 2)
-	if len(parts) != 2 {
-		return fmt.Errorf("invalid export format, expected 'VAR_NAME=VALUE', got: %s", exportStr)
-	}
-
-	left := strings.TrimSpace(parts[0])
-	right := strings.TrimSpace(parts[1])
-
-	// Regular expression to extract variable name inside ${{VAR_NAME}}
-	exportPattern := regexp.MustCompile(`^\${{\s*([\w_]+)\s*}}$`)
-	matches := exportPattern.FindStringSubmatch(left)
-	if len(matches) != 2 {
-		return fmt.Errorf("invalid export pattern, expected format: `${{VAR_NAME}}`, got: %s", left)
-	}
-
-	varName := matches[1]
-	if varName == "" {
-		return fmt.Errorf("export variable name is empty")
-	}
-
-	// Set the environment variable
-	if err := os.Setenv(varName, right); err != nil {
-		return fmt.Errorf("failed to set export variable %s: %w", varName, err)
-	}
-
-	fmt.Printf("Exported environment variable: %s = %s\n", varName, right)
-	return nil
-}
-
-// replaceEnvsInTask replaces all environment variable placeholders in the task fields.
-func replaceEnvsInTask(task *types.Task) {
-	if task == nil {
-		return
-	}
-
-	// Replace in HTTP task fields
-	if task.HttpTaskFields != nil {
-		task.HttpTaskFields.Method = resolveEnvVars(task.HttpTaskFields.Method)
-		task.HttpTaskFields.Url = resolveEnvVars(task.HttpTaskFields.Url)
-		task.HttpTaskFields.Body = resolveEnvVars(task.HttpTaskFields.Body)
-
-		// Replace in headers
-		for key, value := range task.HttpTaskFields.Headers {
-			task.HttpTaskFields.Headers[key] = resolveEnvVars(value)
-		}
-	}
-
-	// Replace in ConditionStatements
-	if task.ConditionStatements != nil {
-		task.ConditionStatements.Condition = resolveEnvVars(task.ConditionStatements.Condition)
-
-		// Replace in Picks
-		if task.ConditionStatements.Pick != nil {
-			if task.ConditionStatements.Pick.Else != nil {
-				replaceEnvsInTask(task.ConditionStatements.Pick.Else)
-			}
-			for _, ifStmt := range task.ConditionStatements.Pick.IfStatement {
-				ifStmt.Try = resolveEnvVars(ifStmt.Try)
-				if ifStmt.Task != nil {
-					replaceEnvsInTask(ifStmt.Task)
+			// Because it's a single HTTP sub-task or a default task
+			// we can check if it's an HTTP or not
+			if t.HttpTaskFields != nil {
+				result, err := executeHTTPRequest(t.HttpTaskFields)
+				if err != nil {
+					errChan <- err
+					return
 				}
+				// If subTask wants to export the result:
+				err = ops.ResolveExport(t.Export, result)
+				errChan <- err
+			} else {
+				// If it's a default or pick, etc.
+				errChan <- executeDefaultTask(&t)
 			}
-		}
+		}(subTask)
+	}
 
-		// Replace in Parallel tasks
-		if task.ConditionStatements.Parallel != nil {
-			for i := range *task.ConditionStatements.Parallel {
-				replaceEnvsInTask(&(*task.ConditionStatements.Parallel)[i])
-			}
+	wg.Wait()
+	close(errChan)
+
+	var errors []string
+	for err := range errChan {
+		if err != nil {
+			errors = append(errors, err.Error())
 		}
 	}
 
+	if len(errors) > 0 {
+		return fmt.Errorf("parallel task execution encountered errors: %s", strings.Join(errors, "; "))
+	}
+
+	return nil
 }
 
-// resolveEnvVars replaces all environment variable placeholders in the input string.
-func resolveEnvVars(input string) string {
-	re := regexp.MustCompile(`\${{\s*([^{}]+)\s*}}`)
-	matches := re.FindAllStringSubmatch(input, -1)
-
-	for _, match := range matches {
-		if len(match) < 2 {
-			continue
+// executePickStatement evaluates the if-else conditions and executes the appropriate task.
+func executePickStatement(pick *types.PickStatement) error {
+	for _, statement := range pick.IfStatement {
+		if ops.CalculateCondition(statement.Try) {
+			fmt.Println("Condition was true: " + statement.Try)
+			task := statement.Task
+			return runTask(task)
 		}
-		envVar := strings.TrimSpace(match[1])
-		value, exists := os.LookupEnv(envVar)
-		if !exists {
-			fmt.Printf("environment variable %s not found\n", envVar)
-			continue
-		}
-		input = strings.ReplaceAll(input, match[0], value)
 	}
-	return input
+
+	// If no if-condition is met, run the else block if exists
+	if pick.Else != nil {
+		fmt.Println("Running the else option")
+		return runTask(pick.Else)
+	}
+	return nil
+}
+
+// runTask decides whether the task is HTTP or default
+func runTask(task *types.Task) error {
+	if task.PyTaskFields != nil {
+		return fmt.Errorf("python not implemented yet")
+	} else if task.HttpTaskFields != nil {
+		return executeHTTPTask(task)
+	}
+	return executeDefaultTask(task)
 }
