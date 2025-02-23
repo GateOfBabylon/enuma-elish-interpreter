@@ -32,13 +32,10 @@ func (ptv *PythonTaskValidator) Validate(task *types.Task) error {
 	if err := generalTaskValidation(task); err != nil {
 		return err
 	}
-
 	if task.HttpTaskFields != nil {
 		return errors.New("python task could not use other task specific fields")
 	}
-
 	if task.PyTaskFields != nil {
-		// One of script or script path must be different from empty string
 		if task.PyTaskFields.Script == "" && task.PyTaskFields.ScriptPath == "" {
 			return errors.New("script or script path is required")
 		}
@@ -144,7 +141,7 @@ func init() {
 	RegisterTaskValidator(types.PYTHON, &PythonTaskValidator{})
 }
 
-func ValidateTask(task *types.Task, executorType types.ExecutorType) error {
+func Task(task *types.Task, executorType types.ExecutorType) error {
 	validator, err := GetTaskValidator(executorType)
 	if err != nil {
 		return err

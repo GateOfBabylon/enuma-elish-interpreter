@@ -21,8 +21,6 @@ import (
 var dockerCli *dockerclient.Client
 
 func init() {
-	// Create a global Docker client once (if you want a single instance).
-	// You could also do this in your main or an init step.
 	cli, err := dockerclient.NewClientWithOpts(
 		dockerclient.FromEnv,
 		dockerclient.WithAPIVersionNegotiation(),
@@ -38,13 +36,10 @@ func executePythonTask(task *types.Task, universe *types.Universe) error {
 	log.Printf("Executing Python task: %q\n", task.Name)
 	ops.ReplaceEnvsInTask(task)
 
-	// Wrap the actual container-run logic in a closure for timeouts/retries
 	executeFunc := func() (string, error) {
 		if task.PyTaskFields == nil {
-			// fallback
 			return "", executeDefaultTask(task, universe)
 		}
-		// Possibly do Docker login once at a higher level
 		return executePythonScripts(task.PyTaskFields, universe, task.TimeStatements)
 	}
 
@@ -74,7 +69,6 @@ func executePythonTask(task *types.Task, universe *types.Universe) error {
 		time.Sleep(time.Duration(task.TimeStatements.Delay) * time.Millisecond)
 	}
 
-	fmt.Printf("DEBUG::: response is %s\n", response)
 	// Extract actual response value from logs
 	response, err = ops.ExtractExportedValue(response)
 	if err != nil {
@@ -117,7 +111,6 @@ func executePythonScripts(fields *types.PyTaskFields, universe *types.Universe, 
 	if err != nil {
 		return "", fmt.Errorf("container execution failed: %w", err)
 	}
-	log.Printf("DEBUG::: Output: %s\n", output)
 	return output, nil
 
 }

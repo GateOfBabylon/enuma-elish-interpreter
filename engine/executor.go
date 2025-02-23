@@ -16,7 +16,7 @@ func ExecuteExecutor(executor *types.Executor) error {
 	}
 
 	log.Printf("Executing executor: %s, type: %s\n", executor.Name, executor.Type)
-	if err := ExtractEnvs(executor); err != nil {
+	if err := extractEnvs(executor); err != nil {
 		return err
 	}
 
@@ -28,7 +28,7 @@ func ExecuteExecutor(executor *types.Executor) error {
 	return nil
 }
 
-func ExtractEnvs(executor *types.Executor) error {
+func extractEnvs(executor *types.Executor) error {
 	for key, value := range executor.Env {
 		strValue := convert.InterfaceToString(value)
 		if err := os.Setenv(key, strValue); err != nil {

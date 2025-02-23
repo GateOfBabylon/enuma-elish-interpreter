@@ -14,7 +14,7 @@ func ExecuteTask(task *types.Task, executor *types.Executor) error {
 	log.Printf("Starting execution for Task: %q with ExecutorType: %s\n", task.Name, executor.Type)
 
 	// Validate the task
-	if err := validate.ValidateTask(task, executor.Type); err != nil {
+	if err := validate.Task(task, executor.Type); err != nil {
 		return fmt.Errorf("task validation failed: %w", err)
 	}
 
