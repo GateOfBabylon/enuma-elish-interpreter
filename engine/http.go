@@ -18,10 +18,8 @@ func executeHTTPTask(task *types.Task) error {
 
 	executeFunc := func() (string, error) {
 		if task.HttpTaskFields != nil {
-			log.Printf("Found HttpTaskFields for Task: %q\n", task.Name)
 			return executeHTTPRequest(task.HttpTaskFields)
 		}
-		log.Printf("No HttpTaskFields. Falling back to default task logic for Task: %q\n", task.Name)
 		return "", executeDefaultTask(task, &types.Universe{})
 	}
 
@@ -53,13 +51,12 @@ func executeHTTPTask(task *types.Task) error {
 		time.Sleep(time.Duration(task.TimeStatements.Delay) * time.Millisecond)
 	}
 
-	log.Printf("Task: %q received response: %q\n", task.Name, response)
 	if task.Export != "" && response != "" {
 		log.Printf("Exporting response for Task: %q\n", task.Name)
 		return ops.ResolveExport(task.Export, response)
 	}
 
-	log.Printf("Finished HTTP task: %q with no export\n", task.Name)
+	log.Printf("Finished HTTP task: %q\n", task.Name)
 	return nil
 }
 
@@ -69,7 +66,6 @@ func executeHTTPRequest(httpFields *types.HttpTaskFields) (string, error) {
 
 	var body io.Reader
 	if httpFields.Body != "" {
-		log.Printf("With body: %s\n", httpFields.Body)
 		body = strings.NewReader(httpFields.Body)
 	}
 
@@ -79,7 +75,6 @@ func executeHTTPRequest(httpFields *types.HttpTaskFields) (string, error) {
 	}
 
 	for key, value := range httpFields.Headers {
-		log.Printf("Setting header: %s = %s\n", key, value)
 		req.Header.Set(key, value)
 	}
 

@@ -3,7 +3,6 @@ package ops
 import (
 	"fmt"
 	"github.com/GateOfBabylon/enuma-elish-interpreter/types"
-	"log"
 	"os"
 	"regexp"
 	"strings"
@@ -68,10 +67,7 @@ func ExtractExportedValue(output string) (string, error) {
 		return "", fmt.Errorf("failed to extract export value from output")
 	}
 
-	varName := strings.TrimSpace(matches[1])
 	varValue := strings.TrimSpace(matches[2])
-
-	log.Printf("Extracted exported variable: %s = %s", varName, varValue)
 	return varValue, nil
 }
 

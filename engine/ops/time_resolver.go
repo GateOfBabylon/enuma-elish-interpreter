@@ -2,6 +2,7 @@ package ops
 
 import (
 	"fmt"
+	"log"
 	"time"
 )
 
@@ -39,12 +40,7 @@ func ExecuteWithRetry(executeFunc func() (string, error), retries int) (string, 
 		if err == nil {
 			return response, nil
 		}
-
-		fmt.Printf("Attempt %d failed: %v\n", attempt+1, err)
-		if attempt < retries {
-			time.Sleep(1 * time.Second) // default delay between retries
-			fmt.Printf("Retrying...\n")
-		}
+		log.Printf("Attempt %d failed: %v\n", attempt+1, err)
 	}
 	return "", fmt.Errorf("all %d attempts failed: %w", retries+1, err)
 }

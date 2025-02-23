@@ -34,7 +34,6 @@ func extractEnvs(executor *types.Executor) error {
 		if err := os.Setenv(key, strValue); err != nil {
 			return fmt.Errorf("setting environment variable %q failed: %w", key, err)
 		}
-		log.Printf("Set environment variable: %s=%s\n", key, strValue)
 	}
 	return nil
 }

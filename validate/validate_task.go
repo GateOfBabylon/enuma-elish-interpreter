@@ -36,11 +36,8 @@ func (ptv *PythonTaskValidator) Validate(task *types.Task) error {
 		return errors.New("python task could not use other task specific fields")
 	}
 	if task.PyTaskFields != nil {
-		if task.PyTaskFields.Script == "" && task.PyTaskFields.ScriptPath == "" {
-			return errors.New("script or script path is required")
-		}
-		if task.PyTaskFields.Script != "" && task.PyTaskFields.ScriptPath != "" {
-			return errors.New("script and script path are mutually exclusive")
+		if task.PyTaskFields.ScriptPath == "" {
+			return errors.New("script path is required")
 		}
 	}
 	return nil

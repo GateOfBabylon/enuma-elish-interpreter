@@ -72,7 +72,6 @@ func executePythonTask(task *types.Task, universe *types.Universe) error {
 	// Extract actual response value from logs
 	response, err = ops.ExtractExportedValue(response)
 	if err != nil {
-		log.Printf("No export variable found in output. Using raw output as response.")
 		response = strings.TrimSpace(response)
 	}
 	// Export result
@@ -85,7 +84,6 @@ func executePythonTask(task *types.Task, universe *types.Universe) error {
 // executePythonScripts is a helper that does the actual Docker-based Python execution.
 func executePythonScripts(fields *types.PyTaskFields, universe *types.Universe, ts *types.TimeStatements) (string, error) {
 	if universe.Secret != "" {
-		log.Printf("Attempting Docker login for secret: %s\n", universe.Secret)
 		decoded, err := base64.StdEncoding.DecodeString(universe.Secret)
 		if err != nil {
 			return "", fmt.Errorf("failed to decode base64 secret: %w", err)
@@ -96,9 +94,7 @@ func executePythonScripts(fields *types.PyTaskFields, universe *types.Universe, 
 			log.Printf("Decoded secret doesn't appear to be 'user:pass': %s\n", string(decoded))
 		} else {
 			user, pass := credentials[0], credentials[1]
-			fmt.Printf("Attempting Docker login for secret: %s:%s\n", user, pass)
 			if err := dockerLoginCLI(user, pass, universe.World); err != nil {
-				fmt.Printf("Error: %q\n", err)
 				return "", fmt.Errorf("docker login failed: %w", err)
 			}
 		}
@@ -111,6 +107,10 @@ func executePythonScripts(fields *types.PyTaskFields, universe *types.Universe, 
 	if err != nil {
 		return "", fmt.Errorf("container execution failed: %w", err)
 	}
+	if err = extractAndSetEnvVars(output); err != nil {
+		return "", fmt.Errorf("container execution failed: %w", err)
+	}
+
 	return output, nil
 
 }
@@ -129,7 +129,6 @@ func extractAndSetEnvVars(output string) error {
 			varName := match[1]
 			varValue := strings.TrimSpace(match[2])
 
-			log.Printf("Setting environment variable: %s = %s", varName, varValue)
 			if err := os.Setenv(varName, varValue); err != nil {
 				return fmt.Errorf("failed to set export variable %s: %w", varName, err)
 			}
@@ -160,14 +159,12 @@ func runPythonInDocker(image string, cmdArgs []string, envVars []string, ts *typ
 		Env:        envVars,
 		WorkingDir: "/app",
 	}
-	log.Printf("Creating container with image: %s, cmd: %v\n", image, config.Cmd)
 
 	resp, err := dockerCli.ContainerCreate(ctx, config, nil, nil, nil, "")
 	if err != nil {
 		return "", fmt.Errorf("failed to create container: %w", err)
 	}
 
-	log.Printf("Starting container: %s\n", resp.ID)
 	if err := dockerCli.ContainerStart(ctx, resp.ID, container.StartOptions{}); err != nil {
 		return "", fmt.Errorf("failed to start container: %w", err)
 	}
@@ -205,7 +202,6 @@ func runPythonInDocker(image string, cmdArgs []string, envVars []string, ts *typ
 // dockerLoginCLI is a simple demonstration using the Docker CLI to login.
 // For a more robust solution, you can do a programmatic login with the Docker engine API.
 func dockerLoginCLI(user, pass, image string) error {
-	log.Printf("Docker login user: %s, for image: %s\n", user, image)
 	cmd := exec.Command("docker", "login", "-u", user, "--password-stdin")
 	in, err := cmd.StdinPipe()
 	if err != nil {
