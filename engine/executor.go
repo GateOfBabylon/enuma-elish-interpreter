@@ -5,28 +5,30 @@ import (
 	"os"
 
 	"github.com/GateOfBabylon/enuma-elish-interpreter/convert"
+	"github.com/GateOfBabylon/enuma-elish-interpreter/logger"
 	"github.com/GateOfBabylon/enuma-elish-interpreter/types"
 	"github.com/GateOfBabylon/enuma-elish-interpreter/validate"
 )
 
-func ExecuteExecutor(executor *types.Executor) ([]string, error) {
-	logs := make([]string, 0)
+func ExecuteExecutor(executor *types.Executor) error {
+	log := logger.GetLogger()
 
 	if err := validate.Executor(executor); err != nil {
-		return logs, fmt.Errorf("executor validation failed: %w", err)
+		return fmt.Errorf("executor validation failed: %w", err)
 	}
 
-	logs = append(logs, fmt.Sprintf("<Datetime in format: 2025/03/08 10:04:31> Executing executor: %s, type: %s\n", executor.Name, executor.Type))
+	log.Log("Executing executor: %s, type: %s", executor.Name, executor.Type)
 	if err := extractEnvs(executor); err != nil {
-		return logs, err
+		return err
 	}
 
 	for _, task := range executor.Tasks {
 		if err := ExecuteTask(&task, executor); err != nil {
-			return logs, fmt.Errorf("task %q execution failed: %w", task.Name, err)
+			fmt.Println("AAAAAAAA")
+			return fmt.Errorf("task %q execution failed: %w", task.Name, err)
 		}
 	}
-	return logs, nil
+	return nil
 }
 
 func extractEnvs(executor *types.Executor) error {

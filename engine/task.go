@@ -3,17 +3,14 @@ package engine
 import (
 	"fmt"
 	"github.com/GateOfBabylon/enuma-elish-interpreter/engine/ops"
+	"github.com/GateOfBabylon/enuma-elish-interpreter/logger"
 	"github.com/GateOfBabylon/enuma-elish-interpreter/types"
 	"github.com/GateOfBabylon/enuma-elish-interpreter/validate"
-	"log"
 	"strings"
 	"sync"
 )
 
 func ExecuteTask(task *types.Task, executor *types.Executor) error {
-	log.Printf("Starting execution for Task: %q with ExecutorType: %s\n", task.Name, executor.Type)
-
-	// Validate the task
 	if err := validate.Task(task, executor.Type); err != nil {
 		return fmt.Errorf("task validation failed: %w", err)
 	}
@@ -49,7 +46,8 @@ func executeDefaultTask(task *types.Task, universe *types.Universe) error {
 
 // executeParallelTasks executes multiple tasks concurrently.
 func executeParallelTasks(parallelTasks *[]types.Task, universe *types.Universe) error {
-	log.Printf("Found %d parallel tasks\n", len(*parallelTasks))
+	log := logger.GetLogger()
+	log.Log("Found %d parallel tasks.", len(*parallelTasks))
 	var wg sync.WaitGroup
 	errChan := make(chan error, len(*parallelTasks))
 
@@ -60,7 +58,8 @@ func executeParallelTasks(parallelTasks *[]types.Task, universe *types.Universe)
 			if t.HttpTaskFields != nil {
 				result, err := executeHTTPRequest(t.HttpTaskFields)
 				if err != nil {
-					errChan <- fmt.Errorf("error in subTask: %q => %w", t.Name, err)
+					log.Log("error in task: %q => %w", t.Name, err)
+					errChan <- fmt.Errorf("error in task: %q => %w", t.Name, err)
 					return
 				}
 				err = ops.ResolveExport(t.Export, result)
@@ -70,7 +69,8 @@ func executeParallelTasks(parallelTasks *[]types.Task, universe *types.Universe)
 			} else if t.PyTaskFields != nil {
 				result, err := executePythonScripts(t.PyTaskFields, universe, t.TimeStatements)
 				if err != nil {
-					errChan <- fmt.Errorf("error in subTask: %q => %w", t.Name, err)
+					log.Log("error in task: %q => %w", t.Name, err)
+					errChan <- fmt.Errorf("error in task: %q => %w", t.Name, err)
 					return
 				}
 				err = ops.ResolveExport(t.Export, result)
@@ -108,7 +108,6 @@ func executePickStatement(pick *types.PickStatement, universe *types.Universe) e
 		}
 	}
 
-	// If no if-condition is met, run the else block if it exists
 	if pick.Else != nil {
 		return runTask(pick.Else, universe)
 	}
