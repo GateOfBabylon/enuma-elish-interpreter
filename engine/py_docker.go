@@ -38,6 +38,16 @@ func executePythonTask(task *types.Task, universe *types.Universe) error {
 	logger.Log("Executing Python task: %q", task.Name)
 	ops.ReplaceEnvsInTask(task)
 
+	if task.ConditionStatements != nil {
+		if task.ConditionStatements.Condition != "" {
+			condition := ops.CalculateCondition(task.ConditionStatements.Condition)
+			if !condition {
+				logger.Log("Task skipped because of condition statement")
+				return nil
+			}
+		}
+	}
+
 	executeFunc := func() (string, error) {
 		if task.PyTaskFields != nil {
 			return executePythonScripts(task.PyTaskFields, universe, task.TimeStatements)

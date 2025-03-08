@@ -24,7 +24,6 @@ func ExecuteExecutor(executor *types.Executor) error {
 
 	for _, task := range executor.Tasks {
 		if err := ExecuteTask(&task, executor); err != nil {
-			fmt.Println("AAAAAAAA")
 			return fmt.Errorf("task %q execution failed: %w", task.Name, err)
 		}
 	}

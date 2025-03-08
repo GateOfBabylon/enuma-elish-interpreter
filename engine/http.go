@@ -17,6 +17,16 @@ func executeHTTPTask(task *types.Task) error {
 	logger.Log("Executing HTTP task: %q", task.Name)
 	ops.ReplaceEnvsInTask(task)
 
+	if task.ConditionStatements != nil {
+		if task.ConditionStatements.Condition != "" {
+			condition := ops.CalculateCondition(task.ConditionStatements.Condition)
+			if !condition {
+				logger.Log("Task skipped because of condition statement")
+				return nil
+			}
+		}
+	}
+
 	executeFunc := func() (string, error) {
 		if task.HttpTaskFields != nil {
 			return executeHTTPRequest(task.HttpTaskFields)
@@ -54,7 +64,7 @@ func executeHTTPTask(task *types.Task) error {
 		}
 	}
 
-	logger.Log("Finished HTTP request: %q with SUCCESS.", task.Name)
+	logger.Log("Finished HTTP request: %q.", task.Name)
 	return nil
 }
 

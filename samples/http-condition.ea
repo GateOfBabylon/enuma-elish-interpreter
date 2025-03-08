@@ -1,0 +1,37 @@
+executor:
+  name: "create-or-update-resource"
+  type: "http"
+  env:
+    user: "admin"
+    pass: "top-secret"
+    id: "123"
+  tasks:
+    - name: "ensure-token"
+      method: "POST"
+      url: "http://localhost:8080/api/token"
+      headers:
+        Content-Type: "application/json"
+      body: '{"username":"${{user}}", "password":"${{pass}}"}'
+      export: ${{token}}
+    - name: "check-existing"
+      method: "GET"
+      url: "http://localhost:8080/api/resource/${{id}}"
+      headers:
+        Authorization: "Bearer ${{token}}"
+      export: ${{exists}}
+    - name: "create-resource"
+      method: "POST"
+      condition: ${{exists}} == "false"
+      url: "http://localhost:8080/api/resource"
+      headers:
+        Authorization: "Bearer ${{token}}"
+        Content-Type: "application/json"
+      body: '{"id":${{id}}, "data":"new data"}'
+    - name: "update-resource"
+      method: "PUT"
+      condition: ${{exists}} == "true"
+      url: "http://localhost:8080/api/resource/${{id}}"
+      headers:
+        Authorization: "Bearer ${{token}}"
+        Content-Type: "application/json"
+      body: '{"data":"updated data"}'

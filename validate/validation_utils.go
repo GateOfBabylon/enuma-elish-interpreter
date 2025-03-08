@@ -7,7 +7,7 @@ func IsValidName(name string) bool {
 	return re.MatchString(name)
 }
 
-var supportedHttpMethodNames = []string{"POST", "GET", "DELETE"}
+var supportedHttpMethodNames = []string{"POST", "PUT", "GET", "DELETE"}
 
 func IsSupportedHttpMethod(httpMethod string) bool {
 	for _, name := range supportedHttpMethodNames {
