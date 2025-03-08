@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/GateOfBabylon/enuma-elish-interpreter/engine"
 	"github.com/GateOfBabylon/enuma-elish-interpreter/logger"
@@ -18,6 +19,11 @@ func main() {
 	}
 
 	eaFile := os.Args[1]
+
+	if !strings.HasSuffix(eaFile, ".ea") {
+		log.Log("Error: Provided file does not have a .ea extension: %s", eaFile)
+		printLogsAndExit(log, 1)
+	}
 
 	executor, err := parser.ParseExecutor(eaFile)
 	if err != nil {
@@ -52,5 +58,5 @@ func printHelp() {
 	fmt.Println("  --help   Show this help message")
 	fmt.Println("")
 	fmt.Println("Description:")
-	fmt.Println("  This program is an interpreter for EA (Enuma Elish) files. Provide a path to an EA file to execute it.")
+	fmt.Println("  This program is an interpreter for EA (Enuma Elish) files. Provide a path to an EA file with a .ea extension to execute it.")
 }
