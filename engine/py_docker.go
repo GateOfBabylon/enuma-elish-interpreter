@@ -62,7 +62,7 @@ func executePythonTask(task *types.Task, universe *types.Universe) error {
 	if err != nil {
 		return fmt.Errorf("failed after %d retries for %q: %w", retries, task.Name, err)
 	}
-
+	log.Printf("Responce from task: %v", response)
 	// Delay after execution
 	if task.TimeStatements != nil && task.TimeStatements.Delay > 0 {
 		log.Printf("Applying delay of %d ms\n", task.TimeStatements.Delay)

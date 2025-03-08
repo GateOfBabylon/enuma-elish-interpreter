@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"github.com/GateOfBabylon/enuma-elish-interpreter/engine"
 	"github.com/GateOfBabylon/enuma-elish-interpreter/parser"
 )
@@ -10,8 +11,11 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	err = engine.ExecuteExecutor(executor)
+	logs, err := engine.ExecuteExecutor(executor)
 	if err != nil {
 		panic(err)
+	}
+	for _, log := range logs {
+		fmt.Println(log)
 	}
 }

@@ -2,7 +2,6 @@ package engine
 
 import (
 	"fmt"
-	"log"
 	"os"
 
 	"github.com/GateOfBabylon/enuma-elish-interpreter/convert"
@@ -10,22 +9,24 @@ import (
 	"github.com/GateOfBabylon/enuma-elish-interpreter/validate"
 )
 
-func ExecuteExecutor(executor *types.Executor) error {
+func ExecuteExecutor(executor *types.Executor) ([]string, error) {
+	logs := make([]string, 0)
+
 	if err := validate.Executor(executor); err != nil {
-		return fmt.Errorf("executor validation failed: %w", err)
+		return logs, fmt.Errorf("executor validation failed: %w", err)
 	}
 
-	log.Printf("Executing executor: %s, type: %s\n", executor.Name, executor.Type)
+	logs = append(logs, fmt.Sprintf("<Datetime in format: 2025/03/08 10:04:31> Executing executor: %s, type: %s\n", executor.Name, executor.Type))
 	if err := extractEnvs(executor); err != nil {
-		return err
+		return logs, err
 	}
 
 	for _, task := range executor.Tasks {
 		if err := ExecuteTask(&task, executor); err != nil {
-			return fmt.Errorf("task %q execution failed: %w", task.Name, err)
+			return logs, fmt.Errorf("task %q execution failed: %w", task.Name, err)
 		}
 	}
-	return nil
+	return logs, nil
 }
 
 func extractEnvs(executor *types.Executor) error {

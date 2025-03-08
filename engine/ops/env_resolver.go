@@ -88,6 +88,11 @@ func ReplaceEnvsInTask(task *types.Task) {
 		}
 	}
 
+	// Replace in Python task fields
+	if task.PyTaskFields != nil {
+		task.PyTaskFields.ScriptPath = resolveEnvVars(task.PyTaskFields.ScriptPath)
+	}
+
 	// Replace in ConditionStatements
 	if task.ConditionStatements != nil {
 		task.ConditionStatements.Condition = resolveEnvVars(task.ConditionStatements.Condition)
