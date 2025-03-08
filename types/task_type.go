@@ -18,6 +18,5 @@ type HttpTaskFields struct {
 }
 
 type PyTaskFields struct {
-	Script     string `yaml:"script,omitempty"`
 	ScriptPath string `yaml:"scriptPath,omitempty"`
 }

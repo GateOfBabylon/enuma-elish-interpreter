@@ -2,10 +2,10 @@ executor:
     name: confirm-or-reject-status
     type: python
     universe:
-        world: docker.io/my-docker-image:latest
-        secret: my_docker_registry_credentials
+        world: ivannik2910/py-container:latest
+        secret: aXZhbm5pazI5MTA6TWFudHJhRGViaWw3
     env:
-        status: pending
+        status: init
     tasks:
         - name: check-status
           export: ${{status}}
@@ -15,11 +15,11 @@ executor:
         - name: confirm-or-reject
           pick:
             if:
-                - try: ${{status == 'ready'}}
+                - try: ${{status}} == 'ready'
                   scriptPath: ./scripts/confirm_resource.py
-                - try: ${{status == 'pending'}}
+                - try: ${{status}} == 'pending'
                   scriptPath: ./scripts/queue_resource_for_review.py
-                - try: ${{status == 'error'}}
+                - try: ${{status}}  == 'error'
                   scriptPath: ./scripts/report_resource_error.py
             else:
                 scriptPath: ./scripts/reject_resource.py

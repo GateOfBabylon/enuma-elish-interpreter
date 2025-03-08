@@ -59,6 +59,18 @@ func ResolveExportIntoOs(exportStr string) error {
 	return nil
 }
 
+func ExtractExportedValue(output string) (string, error) {
+	exportPattern := regexp.MustCompile(`(?m)export\s+(\w+)\s*=\s*(.+)`)
+	matches := exportPattern.FindStringSubmatch(output)
+
+	if len(matches) != 3 {
+		return "", fmt.Errorf("failed to extract export value from output")
+	}
+
+	varValue := strings.TrimSpace(matches[2])
+	return varValue, nil
+}
+
 // ReplaceEnvsInTask replaces all environment variable placeholders in the task fields.
 func ReplaceEnvsInTask(task *types.Task) {
 	if task == nil {
@@ -74,6 +86,11 @@ func ReplaceEnvsInTask(task *types.Task) {
 		for key, value := range task.HttpTaskFields.Headers {
 			task.HttpTaskFields.Headers[key] = resolveEnvVars(value)
 		}
+	}
+
+	// Replace in Python task fields
+	if task.PyTaskFields != nil {
+		task.PyTaskFields.ScriptPath = resolveEnvVars(task.PyTaskFields.ScriptPath)
 	}
 
 	// Replace in ConditionStatements
