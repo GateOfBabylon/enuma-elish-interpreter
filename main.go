@@ -2,41 +2,55 @@ package main
 
 import (
 	"fmt"
-	"github.com/GateOfBabylon/enuma-elish-interpreter/engine"
-	. "github.com/GateOfBabylon/enuma-elish-interpreter/logger"
-	"github.com/GateOfBabylon/enuma-elish-interpreter/parser"
 	"os"
+
+	"github.com/GateOfBabylon/enuma-elish-interpreter/engine"
+	"github.com/GateOfBabylon/enuma-elish-interpreter/logger"
+	"github.com/GateOfBabylon/enuma-elish-interpreter/parser"
 )
 
 func main() {
-	logger := GetLogger()
+	log := logger.GetLogger()
 
-	if len(os.Args) < 2 {
-		logger.Log("path to ea file is not specified")
-		printLogsAndExit(logger, 1)
+	if len(os.Args) < 2 || os.Args[1] == "--help" {
+		printHelp()
+		os.Exit(0)
 	}
 
 	eaFile := os.Args[1]
 
 	executor, err := parser.ParseExecutor(eaFile)
 	if err != nil {
-		logger.Log("Failed to parse EA file: %v", err)
-		printLogsAndExit(logger, 1)
+		log.Log("Failed to parse EA file: %v", err)
+		printLogsAndExit(log, 1)
 	}
 
 	err = engine.ExecuteExecutor(executor)
 	if err != nil {
-		logger.Log("Executor execution failed: %v", err)
-		printLogsAndExit(logger, 1)
+		log.Log("Executor execution failed: %v", err)
+		printLogsAndExit(log, 1)
 	}
 
-	logger.Log("Execution completed successfully.")
-	printLogsAndExit(logger, 0)
+	log.Log("Execution completed successfully.")
+	printLogsAndExit(log, 0)
 }
 
-func printLogsAndExit(logger *Logger, exitCode int) {
-	for _, log := range logger.GetLogs() {
-		fmt.Println(log)
+// printLogsAndExit prints all log messages and exits with the given status code.
+func printLogsAndExit(logger *logger.Logger, exitCode int) {
+	for _, logMsg := range logger.GetLogs() {
+		fmt.Println(logMsg)
 	}
 	os.Exit(exitCode)
+}
+
+// printHelp displays usage instructions for the interpreter.
+func printHelp() {
+	fmt.Println("Usage:")
+	fmt.Println("  enumago <path_to_ea_file>")
+	fmt.Println("")
+	fmt.Println("Options:")
+	fmt.Println("  --help   Show this help message")
+	fmt.Println("")
+	fmt.Println("Description:")
+	fmt.Println("  This program is an interpreter for EA (Enuma Elish) files. Provide a path to an EA file to execute it.")
 }
