@@ -101,6 +101,19 @@ func executeHTTPRequest(httpFields *types.HttpTaskFields) (string, error) {
 		return "", fmt.Errorf("failed to read response body: %w", err)
 	}
 
+	if httpError := checkError(resp, responseData); httpError != nil {
+		return "", httpError
+	}
+
 	logger.Log("Request completed with status %d", resp.StatusCode)
 	return string(responseData), nil
+}
+
+func checkError(resp *http.Response, responseData []byte) error {
+	if resp.StatusCode >= 400 && resp.StatusCode < 500 {
+		return fmt.Errorf("HTTP request failed with client error %d: %s", resp.StatusCode, string(responseData))
+	} else if resp.StatusCode >= 500 {
+		return fmt.Errorf("HTTP request failed with server error %d: %s", resp.StatusCode, string(responseData))
+	}
+	return nil
 }

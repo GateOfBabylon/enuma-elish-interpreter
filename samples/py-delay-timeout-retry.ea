@@ -1,0 +1,16 @@
+executor:
+    name: confirm-or-reject-status
+    type: python
+    universe:
+        world: ivannik2910/py-container:latest
+        secret: aXZhbm5pazI5MTA6TWFudHJhRGViaWw3
+    tasks:
+        - name: execute-with-delay
+          delay: 10000
+          scriptPath: ./scripts/check_status.py
+          export: ${{status}}
+        - name: check-with-timeout
+          timeout: 6000
+          scriptPath: ./scripts/wait_for_ready.py ${{status}}
+        - name: exit-error
+          scriptPath: ./scripts/exit_error.py

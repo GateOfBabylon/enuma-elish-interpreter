@@ -36,7 +36,6 @@ func executeDefaultTask(task *types.Task, universe *types.Universe) error {
 		}
 	}
 
-	// If there's no special logic, but we have an export directive
 	if task.Export != "" {
 		return ops.ResolveExportIntoOs(task.Export)
 	}
@@ -56,26 +55,18 @@ func executeParallelTasks(parallelTasks *[]types.Task, universe *types.Universe)
 		go func(t types.Task) {
 			defer wg.Done()
 			if t.HttpTaskFields != nil {
-				result, err := executeHTTPRequest(t.HttpTaskFields)
+				err := executeHTTPTask(&t)
 				if err != nil {
-					log.Log("error in task: %q => %w", t.Name, err)
-					errChan <- fmt.Errorf("error in task: %q => %w", t.Name, err)
+					log.Log("error in task: %q => %v", t.Name, err)
+					errChan <- fmt.Errorf("error in task: %q => %v", t.Name, err)
 					return
-				}
-				err = ops.ResolveExport(t.Export, result)
-				if err != nil {
-					errChan <- fmt.Errorf("export error in subTask: %q => %w", t.Name, err)
 				}
 			} else if t.PyTaskFields != nil {
-				result, err := executePythonScripts(t.PyTaskFields, universe, t.TimeStatements)
+				err := executePythonTask(&t, universe)
 				if err != nil {
 					log.Log("error in task: %q => %w", t.Name, err)
-					errChan <- fmt.Errorf("error in task: %q => %w", t.Name, err)
+					errChan <- fmt.Errorf("error in task: %q => %v", t.Name, err)
 					return
-				}
-				err = ops.ResolveExport(t.Export, result)
-				if err != nil {
-					errChan <- fmt.Errorf("export error in subTask: %q => %w", t.Name, err)
 				}
 			} else {
 				errChan <- executeDefaultTask(&t, universe)

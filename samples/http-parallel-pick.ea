@@ -14,6 +14,7 @@ executor:
           parallel:
             - name: fetch-item-details
               export: ${{itemDetails}}
+              retry: 3
               method: GET
               url: http://localhost:8080/api/items/details
               headers:
