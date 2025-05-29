@@ -33,6 +33,7 @@ func (l *Logger) Log(format string, args ...interface{}) {
 	timestamp := time.Now().Format("2006-01-02 15:04:05")
 	logEntry := fmt.Sprintf("%s "+format, append([]interface{}{timestamp}, args...)...)
 	l.logs = append(l.logs, logEntry)
+	fmt.Println(logEntry)
 }
 
 // GetLogs returns all stored logs.

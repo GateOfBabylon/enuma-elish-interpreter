@@ -22,31 +22,23 @@ func main() {
 
 	if !strings.HasSuffix(eaFile, ".ea") {
 		log.Log("Error: Provided file does not have a .ea extension: %s", eaFile)
-		printLogsAndExit(log, 1)
+		os.Exit(1)
 	}
 
 	executor, err := parser.ParseExecutor(eaFile)
 	if err != nil {
 		log.Log("Failed to parse EA file: %v", err)
-		printLogsAndExit(log, 1)
+		os.Exit(1)
 	}
 
 	err = engine.ExecuteExecutor(executor)
 	if err != nil {
 		log.Log("Executor execution failed: %v", err)
-		printLogsAndExit(log, 1)
+		os.Exit(1)
 	}
 
 	log.Log("Execution completed successfully.")
-	printLogsAndExit(log, 0)
-}
-
-// printLogsAndExit prints all log messages and exits with the given status code.
-func printLogsAndExit(logger *logger.Logger, exitCode int) {
-	for _, logMsg := range logger.GetLogs() {
-		fmt.Println(logMsg)
-	}
-	os.Exit(exitCode)
+	os.Exit(0)
 }
 
 // printHelp displays usage instructions for the interpreter.
